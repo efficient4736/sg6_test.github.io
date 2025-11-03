@@ -5,11 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SG6 Sicherheits-Check-in</title>
     <style>
-        body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background: var(--tg-theme-bg-color); color: var(--tg-theme-text-color); }
-        h1 { text-align: center; }
+        body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background: var(--tg-theme-bg-color, #000); color: var(--tg-theme-text-color, #fff) !important; }
+        h1 { text-align: center; color: var(--tg-theme-text-color, #fff) !important; }
         ul { list-style: none; padding: 0; }
-        li { margin-bottom: 10px; }
-        input[type="checkbox"] { margin-right: 10px; }
+        li { margin-bottom: 10px; color: var(--tg-theme-text-color, #fff) !important; }
+        input[type="checkbox"] { margin-right: 10px; accent-color: var(--tg-theme-button-color, #FF0000); }
     </style>
 </head>
 <body>
@@ -25,6 +25,16 @@
         tg.ready();
         tg.expand();
 
+        // BiometricManager initialisieren
+        tg.BiometricManager.init((err) => {
+            if (err) {
+                console.error('Biometric Init failed:', err);
+                tg.showAlert('Biometrie-Initialisierung fehlgeschlagen. Gerät unterstützt es möglicherweise nicht.');
+            } else {
+                console.log('BiometricManager initialized');
+            }
+        });
+
         const mainButton = tg.MainButton;
         mainButton.text = 'Check-in Bestätigen';
         mainButton.show();
@@ -36,19 +46,43 @@
                 document.getElementById('regeln').checked
             ];
             if (checks.every(c => c)) {
-                tg.BiometricManager.requestAccess((err, granted) => {
-                    if (granted) {
-                        tg.HapticFeedback.notificationOccurred('success');
-                        tg.sendData('Sicherheits-Check: Erfolgreich');
-                        tg.showAlert('Check-in abgeschlossen – viel Spaß!');
-                    } else {
-                        tg.showAlert('Biometrie-Zugriff verweigert.');
-                    }
-                });
+                if (!tg.BiometricManager.isBiometricAvailable) {
+                    tg.showAlert('Biometrie nicht verfügbar auf diesem Gerät.');
+                    return;
+                }
+                if (!tg.BiometricManager.isAccessGranted) {
+                    tg.BiometricManager.requestAccess({ reason: 'Zur sicheren Bestätigung des Check-ins' }, (granted) => {
+                        if (!granted) {
+                            tg.showAlert('Biometrie-Zugriff verweigert.');
+                            return;
+                        }
+                        authenticateCheckIn();
+                    });
+                } else {
+                    authenticateCheckIn();
+                }
             } else {
                 tg.showAlert('Bitte alle Punkte abhaken!');
             }
         });
+
+        function authenticateCheckIn() {
+            tg.BiometricManager.authenticate({ reason: 'Bestätige deinen Sicherheits-Check-in' }, (success, token) => {
+                if (success) {
+                    tg.HapticFeedback.notificationOccurred('success');
+                    tg.sendData('Sicherheits-Check: Erfolgreich');
+                    tg.showAlert('Check-in abgeschlossen – viel Spaß!');
+                } else {
+                    tg.showAlert('Biometrie-Authentifizierung fehlgeschlagen.');
+                }
+            });
+        }
+
+        // Event-Handler für Debugging
+        tg.onEvent('biometricAuthRequested', (data) => {
+            console.log('Biometric Auth Event:', data);
+        });
+        tg.onEvent('themeChanged', () => location.reload()); // Reload bei Theme-Wechsel für bessere Lesbarkeit
     </script>
 </body>
 </html>
