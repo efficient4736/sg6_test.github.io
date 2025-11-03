@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SG6 Sicherheits-Check-in</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background: var(--tg-theme-bg-color); color: var(--tg-theme-text-color); }
+        h1 { text-align: center; }
+        ul { list-style: none; padding: 0; }
+        li { margin-bottom: 10px; }
+        input[type="checkbox"] { margin-right: 10px; }
+    </style>
+</head>
+<body>
+    <h1>Sicherheits-Check-in</h1>
+    <ul>
+        <li><input type="checkbox" id="brille"> Schutzbrile vorhanden</li>
+        <li><input type="checkbox" id="weste"> Schutzweste vorhanden</li>
+        <li><input type="checkbox" id="regeln"> Regeln verstanden (Fairness, Trefferzonen)</li>
+    </ul>
+
+    <script>
+        const tg = window.Telegram.WebApp;
+        tg.ready();
+        tg.expand();
+
+        const mainButton = tg.MainButton;
+        mainButton.text = 'Check-in Bestätigen';
+        mainButton.show();
+
+        mainButton.onClick(() => {
+            const checks = [
+                document.getElementById('brille').checked,
+                document.getElementById('weste').checked,
+                document.getElementById('regeln').checked
+            ];
+            if (checks.every(c => c)) {
+                tg.BiometricManager.requestAccess((err, granted) => {
+                    if (granted) {
+                        tg.HapticFeedback.notificationOccurred('success');
+                        tg.sendData('Sicherheits-Check: Erfolgreich');
+                        tg.showAlert('Check-in abgeschlossen – viel Spaß!');
+                    } else {
+                        tg.showAlert('Biometrie-Zugriff verweigert.');
+                    }
+                });
+            } else {
+                tg.showAlert('Bitte alle Punkte abhaken!');
+            }
+        });
+    </script>
+</body>
+</html>
