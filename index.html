@@ -25,13 +25,19 @@
         tg.ready();
         tg.expand();
 
-        // BiometricManager initialisieren
+        // BiometricManager initialisieren mit Debugging
         tg.BiometricManager.init((err) => {
             if (err) {
                 console.error('Biometric Init failed:', err);
-                tg.showAlert('Biometrie-Initialisierung fehlgeschlagen. Gerät unterstützt es möglicherweise nicht.');
+                tg.showAlert('Biometrie-Init fehlgeschlagen: ' + err);
             } else {
                 console.log('BiometricManager initialized');
+                console.log('isBiometricAvailable:', tg.BiometricManager.isBiometricAvailable);
+                console.log('biometricType:', tg.BiometricManager.biometricType);
+                console.log('isAccessGranted:', tg.BiometricManager.isAccessGranted);
+                if (!tg.BiometricManager.isBiometricAvailable) {
+                    tg.showAlert('Biometrie nicht verfügbar auf diesem Gerät.');
+                }
             }
         });
 
@@ -46,12 +52,20 @@
                 document.getElementById('regeln').checked
             ];
             if (checks.every(c => c)) {
+                console.log('Alle Checks gesetzt – starte Biometrie-Prozess');
+                if (!tg.BiometricManager.isInited) {
+                    tg.showAlert('BiometricManager nicht initialisiert.');
+                    return;
+                }
                 if (!tg.BiometricManager.isBiometricAvailable) {
-                    tg.showAlert('Biometrie nicht verfügbar auf diesem Gerät.');
+                    tg.showAlert('Biometrie nicht verfügbar – fahre ohne fort.');
+                    completeCheckInWithoutBiometric();
                     return;
                 }
                 if (!tg.BiometricManager.isAccessGranted) {
+                    console.log('Requesting access...');
                     tg.BiometricManager.requestAccess({ reason: 'Zur sicheren Bestätigung des Check-ins' }, (granted) => {
+                        console.log('Access granted:', granted);
                         if (!granted) {
                             tg.showAlert('Biometrie-Zugriff verweigert.');
                             return;
@@ -67,7 +81,9 @@
         });
 
         function authenticateCheckIn() {
+            console.log('Authenticating...');
             tg.BiometricManager.authenticate({ reason: 'Bestätige deinen Sicherheits-Check-in' }, (success, token) => {
+                console.log('Authenticate result:', success, 'Token:', token);
                 if (success) {
                     tg.HapticFeedback.notificationOccurred('success');
                     tg.sendData('Sicherheits-Check: Erfolgreich');
@@ -78,11 +94,21 @@
             });
         }
 
+        function completeCheckInWithoutBiometric() {
+            // Fallback ohne Biometrie
+            tg.HapticFeedback.notificationOccurred('success');
+            tg.sendData('Sicherheits-Check: Erfolgreich (ohne Biometrie)');
+            tg.showAlert('Check-in abgeschlossen (Biometrie nicht verfügbar) – viel Spaß!');
+        }
+
         // Event-Handler für Debugging
+        tg.onEvent('biometricManagerUpdated', (data) => {
+            console.log('Biometric Manager Updated:', data);
+        });
         tg.onEvent('biometricAuthRequested', (data) => {
             console.log('Biometric Auth Event:', data);
         });
-        tg.onEvent('themeChanged', () => location.reload()); // Reload bei Theme-Wechsel für bessere Lesbarkeit
+        tg.onEvent('themeChanged', () => location.reload());
     </script>
 </body>
 </html>
